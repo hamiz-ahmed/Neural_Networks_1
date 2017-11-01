@@ -1,8 +1,7 @@
 import numpy as np
-import cPickle
+import pickle as cPickle
 import os
 import gzip
-import scipy.optimize
 import time
 
 def mnist(datasets_dir='./data'):
@@ -50,7 +49,9 @@ def sigmoid(x):
 
 
 def sigmoid_d(x):
-    return np.exp(-x)/((1+np.exp(-x))**2)
+    # !! TODO ################
+    return sigmoid(x) * (1.0 - sigmoid(x))
+    # TODO ################
 
 
 def tanh(x):
@@ -58,7 +59,9 @@ def tanh(x):
 
 
 def tanh_d(x):
-    return 1.0 - np.tanh(x)**2
+    # !! TODO ################
+    return 1 - (tanh(x) ** 2)
+    # TODO ################
 
 
 def relu(x):
@@ -66,9 +69,11 @@ def relu(x):
 
 
 def relu_d(x):
-    derivative = np.zeros_like(x)
-    derivative[x > 0] = 1
-    return derivative
+    # !!TODO ################
+    dx = np.zeros_like(x)
+    dx[x > 0] = 1
+    return dx
+    # TODO ################
 
 
 def softmax(x, axis=1):
@@ -129,14 +134,14 @@ class Activation(object):
 # define a base class for layers
 class Layer(object):
     def fprop(self, input):
-        """ Calculate layer output for given input 
-            (forward propagation). 
+        """ Calculate layer output for given input
+            (forward propagation).
         """
         raise NotImplementedError('This is an interface class, please use a derived instance')
 
     def bprop(self, output_grad):
-        """ Calculate input gradient and gradient 
-            with respect to weights and bias (backpropagation). 
+        """ Calculate input gradient and gradient
+            with respect to weights and bias (backpropagation).
         """
         raise NotImplementedError('This is an interface class, please use a derived instance')
 
@@ -201,14 +206,15 @@ class FullyConnectedLayer(Layer, Parameterized):
         # where num_units_prev is the number of units in the input
         # (previous) layer
         self.input_shape = input_layer.output_size()
-        # TODO ################################
-        # TODO: implement weight initialization -- done
+        # !! TODO ################################
+        # TODO: implement weight initialization
         # TODO ################################
         # this is the weight matrix it should have shape: (num_units_prev, num_units)
-        self.W = np.random.standard_normal((self.input_shape[1], num_units)) * init_stddev  # FIXME
-
+        weights_shape = (self.input_shape[1], self.num_units)
+        self.W = np.random.standard_normal(weights_shape) * init_stddev  # FIXME
         # and this is the bias vector of shape: (num_units)
-        self.b = np.zeros((1, num_units))  # FIXME
+        bias_weight = (1, self.num_units)
+        self.b = np.zeros(bias_weight)  # FIXME
         # create dummy variables for parameter gradients
         # no need to change these here!
         self.dW = None
@@ -218,25 +224,27 @@ class FullyConnectedLayer(Layer, Parameterized):
         return (self.input_shape[0], self.num_units)
 
     def fprop(self, input):
-        # TODO ################################################
+        # !! TODO ################################################
         # TODO: implement forward propagation
         # NOTE: you should also handle the case were
         #       activation_fun is None (meaning no activation)
         #       then this is simply a linear layer
-        self.last_input = input
-        temp_output = np.dot(input, self.W) + self.b
-        if self.activation_fun:
-            return self.activation_fun.fprop(temp_output)
-        else:
-            return temp_output
         # TODO ################################################
         # you again want to cache the last_input for the bprop
         # implementation below!
+        self.last_input = input
+        # FIXME
+        activation = input.dot(self.W) + self.b
+        if self.activation_fun == None:
+            return activation
+        else:
+            return self.activation_fun.fprop(activation)
+            # raise NotImplementedError("You should implement this!")
+            # return np.zeros(self.output_size)
 
-
-    def bprop(self, output_grad):
+    def bprop(self, output_grad, ):
         """ Calculate input gradient (backpropagation). """
-        # TODO ################################
+        # !! TODO ################################
         # TODO: implement backward propagation
         # TODO ###############################
 
@@ -244,22 +252,23 @@ class FullyConnectedLayer(Layer, Parameterized):
         #       to make gradient checking work
         #       (since you want to divide the loss by number of inputs)
         n = output_grad.shape[0]
-
         # accumulate gradient wrt. the parameters first
         # we will need to store these to later update
         # the network after a few forward backward passes
         # the gradient wrt. W should be stored as self.dW
         # the gradient wrt. b should be stored as selfdb
-
-        if self.activation_fun is None:
-            delta = output_grad
-        else:
-            delta = self.activation_fun.bprop(output_grad)
-
-        self.dW = np.dot(self.last_input.T, delta) / n #last_input*ouput_grad
-        self.db = np.mean(delta, axis=0)
+        # raise NotImplementedError("you should implement this")
+        self.dW = np.zeros((self.last_input.shape[1], self.num_units))  # FIXME
+        self.db = np.zeros((1, self.num_units))  # FIXME
         # the gradient wrt. the input should be calculated here
-        grad_input = np.dot(delta, self.W.T) #outputgrad*weight
+        if self.activation_fun == None:
+            da = output_grad
+        else:
+            da = self.activation_fun.bprop(output_grad)  # theta(L)/theta(act)
+        z = self.last_input
+        self.dW = (z.T.dot(da)) / n
+        self.db = np.mean(da, axis=0)
+        grad_input = np.dot(da, self.W.T)
         return grad_input
 
     def params(self):
@@ -278,7 +287,7 @@ class FullyConnectedLayer(Layer, Parameterized):
 # of the loss through input_grad(). bprop will never
 # be called on them!
 class LinearOutput(Layer, Loss):
-    """ A simple linear output layer that  
+    """ A simple linear output layer that
         uses a squared loss (e.g. should be used for regression)
     """
 
@@ -298,18 +307,19 @@ class LinearOutput(Layer, Loss):
         )
 
     def input_grad(self, Y, Y_pred):
-        # TODO #################################### -- done
+        # !! TODO ####################################
         # TODO: implement gradient of squared loss
         # TODO ####################################
-        return np.abs(Y_pred - Y)
+        loss_grad = np.abs(Y - Y_pred)
+        return loss_grad  # FIXME-
 
     def loss(self, Y, Y_pred):
-        loss = 0.5 * np.square(Y_pred - Y)
+        loss = 0.5 * np.square(Y - Y_pred)
         return np.mean(np.sum(loss, axis=1))
 
 
 class SoftmaxOutput(Layer, Loss):
-    """ A softmax output layer that calculates 
+    """ A softmax output layer that calculates
         the negative log likelihood as loss
         and should be used for classification.
     """
@@ -330,13 +340,14 @@ class SoftmaxOutput(Layer, Loss):
         )
 
     def input_grad(self, Y, Y_pred):
-        # TODO #######################################################
+        # !! TODO #######################################################
         # TODO: implement gradient of the negative log likelihood loss
-        # TODO ####################################################### -- done
+        # TODO #######################################################
         # HINT: since this would involve taking the log
         #       of the softmax (which is np.exp(x)/np.sum(x, axis=1))
         #       this gradient computation can be simplified a lot!
-        return -(Y-Y_pred)
+        loss_grad = -(Y - Y_pred)
+        return loss_grad
 
     def loss(self, Y, Y_pred):
         # Assume one-hot encoding of Y
@@ -347,6 +358,7 @@ class SoftmaxOutput(Layer, Loss):
         # !! TODO ####################################
         # calculate negative log likelihood
         # TODO ####################################
+        out = softmax(Y_pred)
         # TODO ####################################
         # calculate negative log likelihood
         # TODO #################################### -- done
@@ -367,26 +379,27 @@ class NeuralNetwork:
 
     def predict(self, X):
         """ Calculate an output Y for the given input X. """
-        # TODO ##########################################
+        # !! TODO ##########################################
         # TODO: implement forward pass through all layers
         # TODO ##########################################
-        layer_output = self.layers[0].fprop(X)
-        for i in range(1, len(self.layers)):
-            layer_output = self.layers[i].fprop(layer_output)
-        Y_pred = layer_output
+        Y_pred = 0.0
+        n = len(self.layers)
+        inputX = X
+        for i in range(n):
+            inputX = self.layers[i].fprop(inputX)
+        Y_pred = inputX
         return Y_pred
 
     def backpropagate(self, Y, Y_pred, upto=0):
         """ Backpropagation of partial derivatives through
             the complete network up to layer 'upto'
         """
-        # TODO ##########################################
-        # TODO: implement backward pass through all layers
-        # TODO ##########################################
         next_grad = self.layers[-1].input_grad(Y, Y_pred)
-        for i in range(len(self.layers) - 2, upto - 1, -1):
-            next_grad = self.layers[i].bprop(next_grad)
-
+        # TODO ##########################################
+        # TODO: implement forward pass through all layers
+        # TODO ##########################################
+        for layer in reversed(self.layers[upto:-1]):
+            next_grad = layer.bprop(next_grad)
         return next_grad
 
     def classification_error(self, X, Y):
@@ -400,32 +413,25 @@ class NeuralNetwork:
     def sgd_epoch(self, X, Y, learning_rate, batch_size):
         n_samples = X.shape[0]
         n_batches = n_samples // batch_size
-        count = 0
         for b in range(n_batches):
-            # TODO #####################################
+            # !! TODO #####################################
             # Implement stochastic gradient descent here
             # TODO #####################################
             # start by extracting a batch from X and Y
             # (you can assume the inputs are already shuffled)
 
-            x_batch = X[count:count + batch_size]
-            y_batch = Y[count: count + batch_size]
-            count = count + batch_size
-
-            Y_pred = self.predict(x_batch)
-            self.backpropagate(y_batch, Y_pred)
-
-            for layer in self.layers:
-                if isinstance(layer, Parameterized):
-                    W, b = layer.params()
-                    dW, dB = layer.grad_params()
-
-                    W -= learning_rate*dW
-                    b -= learning_rate*dB
-
-            # TODO: then forward and backward propagation + updates
+            # !! TODO: then forward and backward propagation + updates
             # HINT: layer.params() returns parameters *by reference*
             #       so you can easily update in-place
+            inputX = X[b * batch_size:b * batch_size + batch_size]
+            Y_true = Y[b * batch_size:b * batch_size + batch_size]
+            Y_pred = self.predict(inputX)
+            self.backpropagate(Y_true, Y_pred)
+            for layer in self.layers:
+                if isinstance(layer, Parameterized):
+                    for param, grad in zip(layer.params(),
+                                           layer.grad_params()):
+                        param -= learning_rate * grad
 
     def gd_epoch(self, X, Y, learning_rate):
         # TODO ##################################################
@@ -439,47 +445,40 @@ class NeuralNetwork:
         #   you go through the data. Either way you should then
         #   do one gradient step after you went through the
         #   complete dataset!
-
-        self.sgd_epoch(X, Y, learning_rate, X.size[0])
         # TODO ##################################################
+        self.sgd_epoch(X, Y, learning_rate, X.size[0])
 
-    def train(self, X, Y, X_validation=None, Y_validation=None, learning_rate=0.1, max_epochs=100, batch_size=64,
-              descent_type="sgd", y_one_hot=True):
+    def train(self, X, Y, X_valid, Y_valid, learning_rate=0.1, max_epochs=100,
+              batch_size=64, descent_type="sgd", y_one_hot=True):
         """ Train network on the given data. """
         n_samples = X.shape[0]
         n_batches = n_samples // batch_size
         if y_one_hot:
             Y_train = one_hot(Y)
-            if Y_validation is not None:
-                Y_valid_modif = one_hot(Y_validation)
         else:
             Y_train = Y
-            if Y_validation is not None:
-                Y_valid_modif = Y_validation
-
         print("... starting training")
         for e in range(max_epochs + 1):
             if descent_type == "sgd":
-                self.sgd_epoch(X, Y_train, learning_rate, batch_size)
+                self.sgd_epoch(X_train, Y_train, learning_rate, batch_size)
             elif descent_type == "gd":
-                self.gd_epoch(X, Y_train, learning_rate)
+                self.gd_epoch(X_train, Y_train, learning_rate)
             else:
                 raise NotImplementedError("Unknown gradient descent type {}".format(descent_type))
 
             # Output error on the training data
-            train_loss = self._loss(X, Y_train)
-            train_error = self.classification_error(X, Y)
+            train_loss = self._loss(X_train, Y_train)
+            train_error = self.classification_error(X_train, Y)
             print('epoch {:.4f}, loss {:.4f}, train error {:.4f}'.format(e, train_loss, train_error))
             # TODO ##################################################
             # compute error on validation data:
             # simply make the function take validation data as input
             # and then compute errors here and print them
-            if X_validation is not None and Y_validation is not None:
-                valid_loss = self._loss(X_validation, Y_valid_modif)
-                valid_error = self.classification_error(X_validation, Y_validation)
-                print('epoch {:.4f}, loss {:.4f}, validation error {:.4f}'.format(e, valid_loss, valid_error))
-
             # TODO ##################################################
+            if (X_valid != None and Y_valid != None):
+                valid_loss = self._loss(X_valid, Y_valid)
+                valid_error = self.classification_error(X_valid, Y)
+                print('epoch {:.4f}, loss {:.4f}, validation error {:.4f}'.format(e, valid_loss, valid_error))
 
     def check_gradients(self, X, Y):
         """ Helper function to test the parameter gradients for
@@ -521,9 +520,9 @@ class NeuralNetwork:
                     # are currently placed in the network and flatten them
                     # to a vector for convenient comparisons, printing etc.
                     param_init = np.ravel(np.copy(param))
+
                     # TODO ####################################
                     # TODO compute the gradient with respect to
-
                     #      the initial parameters in two ways:
                     #      1) with grad_given_params()
                     #      2) with finite differences
@@ -534,28 +533,25 @@ class NeuralNetwork:
                     #      to each other!
                     # TODO ####################################
                     epsilon = 1e-4
-
                     # making sure your gradient checking routine itself
                     # has no errors can be a bit tricky. To debug it
                     # you can "cheat" by using scipy which implements
                     # gradient checking exactly the way you should!
                     # To do that simply run the following here:
-
-                    # error1 = scipy.optimize.check_grad(output_given_params(param_init),
-                    #                                    grad_given_params(param_init), param_init)
+                    # import scipy.optimize
+                    # err = scipy.optimize.check_grad(output_given_params,
+                    #                                grad_given_params, param_init)
                     loss_base = output_given_params(param_init)
                     # TODO this should hold the gradient as calculated through bprop
                     gparam_bprop = grad_given_params(param_init)
                     # TODO this should hold the gradient calculated through
                     #      finite differences
-                    # calculate difference between them
-
                     gparam_fd = np.zeros_like(param_init)
                     for i in range(len(param_init)):
                         param_init[i] += epsilon
-                        gparam_fd[i] = (output_given_params(param_init) - loss_base) / epsilon
+                        gparam_fd[i] = (output_given_params(param_init) - loss_base) / (epsilon)
                         param_init[i] -= epsilon
-
+                    # calculate difference between them
                     err = np.mean(np.abs(gparam_bprop - gparam_fd))
                     print('diff {:.2e}'.format(err))
                     assert (err < epsilon)
@@ -567,7 +563,8 @@ input_shape = (5, 10)
 n_labels = 6
 layers = [InputLayer(input_shape)]
 
-layers.append(FullyConnectedLayer(layers[-1],
+layers.append(FullyConnectedLayer(
+                layers[-1],
                 num_units=15,
                 init_stddev=0.1,
                 activation_fun=Activation('relu')
@@ -597,25 +594,20 @@ for i in range(Y.shape[0]):
 
 nn.check_gradients(X, Y)
 
-#Training Data
-
 # load
 Dtrain, Dval, Dtest = mnist()
 X_train, y_train = Dtrain
-X_valid, y_valid = Dval
 # Downsample training data to make it a bit faster for testing this code
 n_train_samples = 10000
 train_idxs = np.random.permutation(X_train.shape[0])[:n_train_samples]
-# X_train = X_train[train_idxs]
-# y_train = y_train[train_idxs]
+X_train = X_train[train_idxs]
+y_train = y_train[train_idxs]
 
 print("X_train shape: {}".format(np.shape(X_train)))
 print("y_train shape: {}".format(np.shape(y_train)))
 
 X_train = X_train.reshape(X_train.shape[0], -1)
 print("Reshaped X_train size: {}".format(X_train.shape))
-X_valid = X_valid.reshape((X_valid.shape[0], -1))
-print("Reshaped X_valid size: {}".format(X_valid.shape))
 
 # Setup a small MLP / Neural Network
 # we can set the first shape to None here to indicate that
@@ -647,7 +639,7 @@ layers.append(SoftmaxOutput(layers[-1]))
 nn = NeuralNetwork(layers)
 # Train neural network
 t0 = time.time()
-nn.train(X_train, y_train, X_valid, y_valid, learning_rate=0.1,
+nn.train(X_train, y_train, None, None,learning_rate=0.1,
          max_epochs=20, batch_size=64, y_one_hot=True)
 t1 = time.time()
 print('Duration: {:.1f}s'.format(t1-t0))
