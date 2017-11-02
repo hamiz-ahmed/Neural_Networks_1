@@ -2,7 +2,7 @@ import numpy as np
 import cPickle
 import os
 import gzip
-import scipy.optimize
+import pdb
 import time
 
 def mnist(datasets_dir='./data'):
@@ -256,10 +256,10 @@ class FullyConnectedLayer(Layer, Parameterized):
         else:
             delta = self.activation_fun.bprop(output_grad)
 
-        self.dW = np.dot(self.last_input.T, delta) / n #last_input*ouput_grad
+        self.dW = np.dot(self.last_input.T, delta) / n
         self.db = np.mean(delta, axis=0)
         # the gradient wrt. the input should be calculated here
-        grad_input = np.dot(delta, self.W.T) #outputgrad*weight
+        grad_input = np.dot(delta, self.W.T)
         return grad_input
 
     def params(self):
@@ -440,7 +440,16 @@ class NeuralNetwork:
         #   do one gradient step after you went through the
         #   complete dataset!
 
-        self.sgd_epoch(X, Y, learning_rate, X.size[0])
+        Y_pred = self.predict(X)
+        self.backpropagate(Y, Y_pred)
+
+        for layer in self.layers:
+            if isinstance(layer, Parameterized):
+                W, b = layer.params()
+                dW, dB = layer.grad_params()
+
+                W -= learning_rate * dW
+                b -= learning_rate * dB
         # TODO ##################################################
 
     def train(self, X, Y, X_validation=None, Y_validation=None, learning_rate=0.1, max_epochs=100, batch_size=64,
@@ -477,9 +486,19 @@ class NeuralNetwork:
             if X_validation is not None and Y_validation is not None:
                 valid_loss = self._loss(X_validation, Y_valid_modif)
                 valid_error = self.classification_error(X_validation, Y_validation)
-                print('epoch {:.4f}, loss {:.4f}, validation error {:.4f}'.format(e, valid_loss, valid_error))
+                print('epoch {:.4f}, validation loss {:.4f}, validation error {:.4f}'.format(e, valid_loss, valid_error))
 
             # TODO ##################################################
+
+    def check_test_set(self, X_test, Y_test, y_one_hot=True):
+        if y_one_hot:
+            Y_test_modif = one_hot(Y_test)
+        else:
+            Y_test_modif = Y_test
+
+        test_loss = self._loss(X_test, Y_test_modif)
+        test_error = self.classification_error(X_test, Y_test)
+        print('test loss {:.4f}, test error {:.4f}'.format(test_loss, test_error))
 
     def check_gradients(self, X, Y):
         """ Helper function to test the parameter gradients for
@@ -603,19 +622,24 @@ nn.check_gradients(X, Y)
 Dtrain, Dval, Dtest = mnist()
 X_train, y_train = Dtrain
 X_valid, y_valid = Dval
+X_test, y_test = Dtest
 # Downsample training data to make it a bit faster for testing this code
 n_train_samples = 10000
-train_idxs = np.random.permutation(X_train.shape[0])[:n_train_samples]
+# train_idxs = np.random.permutation(X_train.shape[0])[:n_train_samples]
 # X_train = X_train[train_idxs]
-# y_train = y_train[train_idxs]
+# y_train = y_train[train_idxs]         #removed this to train on whole data
 
 print("X_train shape: {}".format(np.shape(X_train)))
 print("y_train shape: {}".format(np.shape(y_train)))
 
 X_train = X_train.reshape(X_train.shape[0], -1)
 print("Reshaped X_train size: {}".format(X_train.shape))
+
 X_valid = X_valid.reshape((X_valid.shape[0], -1))
 print("Reshaped X_valid size: {}".format(X_valid.shape))
+
+X_test = X_test.reshape((X_test.shape[0], -1))
+print("Reshaped X_test size: {}".format(X_test.shape))
 
 # Setup a small MLP / Neural Network
 # we can set the first shape to None here to indicate that
@@ -630,9 +654,9 @@ layers.append(FullyConnectedLayer(
 ))
 layers.append(FullyConnectedLayer(
                 layers[-1],
-                num_units=100,
+                num_units=200,
                 init_stddev=0.01,
-                activation_fun=Activation('relu')
+                activation_fun=Activation('tanh')
 ))
 layers.append(FullyConnectedLayer(
                 layers[-1],
@@ -648,6 +672,7 @@ nn = NeuralNetwork(layers)
 # Train neural network
 t0 = time.time()
 nn.train(X_train, y_train, X_valid, y_valid, learning_rate=0.1,
-         max_epochs=20, batch_size=64, y_one_hot=True)
+         max_epochs=20, batch_size=64, descent_type="sgd", y_one_hot=True)
+nn.check_test_set(X_test, y_test)
 t1 = time.time()
 print('Duration: {:.1f}s'.format(t1-t0))
