@@ -2,7 +2,6 @@ import numpy as np
 import cPickle
 import os
 import gzip
-import pdb
 import time
 
 def mnist(datasets_dir='./data'):
